@@ -13,7 +13,7 @@ protocol Priority
     var priority:Int { get set }
 }
 
-class Element<T> : Equatable {
+class Element<T> {
     
     var item:T?;
     
@@ -32,6 +32,11 @@ class Element<T> : Equatable {
         }
     }
 
+    deinit {
+        item = nil;
+        prev = nil;
+        next = nil;
+    }
 }
 
 func ==<T>(lhs: Element<T>, rhs: Element<T>) -> Bool
@@ -41,12 +46,16 @@ func ==<T>(lhs: Element<T>, rhs: Element<T>) -> Bool
 
 postfix func ++<T>(inout e: Element<T>?) -> Element<T>?
 {
-    return e?.next;
+    let old = e;
+    e = e?.next;
+    return old;
 }
 
 postfix func --<T>(inout e: Element<T>?) -> Element<T>?
 {
-    return e?.prev;
+    let old = e;
+    e = e?.prev;
+    return old;
 }
 
 class Queue<T>
@@ -76,18 +85,17 @@ class Queue<T>
         tail = Element<T>(item: nil, previous: tail);
     }
     
-    func each(callback:( index: Int, item:T?) -> Void)
+    func each(callback:(Int,T?) -> Void)
     {
         var current = head, idx = 0;
-        while ( current !== tail )
+        while ( !(current === tail) )
         {
-            let item = current?.item;
-            callback(index: idx, item: item);
-            current++;
+            let item:T? = (current++)?.item;
+            callback(idx++,item);
         }
     }
     
-    func addAfter(element: Element<T>, after previous:  Element<T>)
+    func addAfter(element: Element<T>, after previous:  Element<T>) -> Element<T>
     {
         var next = previous.next;
         
@@ -96,9 +104,11 @@ class Queue<T>
         
         element.next = next;
         next?.prev = element;
+        
+        return previous;
     }
     
-    func addBefore(element: Element<T>, before next:  Element<T>)
+    func addBefore(element: Element<T>, before next:  Element<T>) -> Element<T>
     {
         var previous = next.prev;
         
@@ -107,31 +117,80 @@ class Queue<T>
         
         element.prev = previous;
         previous?.next = element;
+        
+        return element;
+    }
+
+    func clear()
+    {
+        var current = head;
+        while( !(current === tail) ){
+            var prev = current++;
+            prev?.next = nil;
+            prev?.item = nil;
+        }
+    }
+    
+    deinit {
+        clear();
+    }
+}
+
+class DefaultItem: Priority
+{
+    unowned var data:AnyObject;
+    
+    var priority:Int;
+    
+    init(data: AnyObject, priority: Int)
+    {
+        self.data = data;
+        self.priority = priority;
+    }
+    
+    deinit
+    {
+        NSLog("Ups <");
     }
     
 }
 
 class PQueue<T where T : Priority> : Queue<T>
 {
+    var maximum:Int? {
+        get {
+            return first()?.priority;
+        }
+    }
+    
+    var minimum:Int? {
+        get {
+            return last()?.priority;
+        }
+    }
+    
     override func add(item:T)
     {
-        if(head != tail)
-        {
-            self.priorityAdd(item);
-        } else {
-            super.add(item);
-        }
+        (head === tail) ? super.add(item) : self.priorityAdd(item);
     }
     
     private func priorityAdd(item: T)
     {
-        let priority = item.priority;
         var element = Element(item: item, previous: nil);
-        var current = head;
-        while( (current != tail) && (priority <= current?.item?.priority)) {
-            current++;
+        let priority = item.priority;
+        if(priority > maximum) {
+            head = addBefore(element, before: head!)
+        } else
+        if(priority <= minimum) {
+            addBefore(element, before: tail!)
+        } else {
+            var current = head;
+            while(priority <= current?.item?.priority)
+            {
+                current++;
+            }
+            addBefore(element, before: current!);
         }
-        addBefore(element, before: current!);
     }
     
 }
