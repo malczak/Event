@@ -13,8 +13,8 @@ protocol Priority
     var priority:Int { get set }
 }
 
-class Element<T> {
-    
+class Element<T>
+{
     var item:T?;
     
     weak var prev:Element<T>?;
@@ -39,9 +39,14 @@ class Element<T> {
     }
 }
 
-func ==<T>(lhs: Element<T>, rhs: Element<T>) -> Bool
+func ==<T:AnyObject>(element:Element<T>?, value:T) -> Bool
 {
-    return ObjectIdentifier(lhs) == ObjectIdentifier(rhs);
+    if let _element = element {
+        if let _elementValue = _element.item {
+            return value === _elementValue;
+        }
+    }
+    return false;
 }
 
 postfix func ++<T>(inout e: Element<T>?) -> Element<T>?
@@ -58,9 +63,9 @@ postfix func --<T>(inout e: Element<T>?) -> Element<T>?
     return old;
 }
 
-class Queue<T>
+class Queue<T: AnyObject>
 {
-    var head:Element<T>?;
+    var head:Element<T>?
     var tail:Element<T>?
     
     init()
@@ -85,13 +90,72 @@ class Queue<T>
         tail = Element<T>(item: nil, previous: tail);
     }
     
+    func remove(item:T)
+    {
+        weak var current = head;
+        while( !(current === tail) && !(current == item) )
+        {
+            current++;
+        }
+        
+        if(current != nil)
+        {
+            remove(current!);
+        }
+    }
+    
+    func remove(index: Int)
+    {
+        weak var current = head;
+        var idx = index;
+        
+        while ( !(current === tail) && (idx > 0) ){
+            idx -= 1;
+            current++;
+        }
+        
+        if(current != nil)
+        {
+            remove(current!);
+        }
+    }
+    
+    func remove(element: Element<T>) -> Element<T>?
+    {
+        if(head === tail)
+        {
+            return nil;
+        }
+        
+        let fixHead = element === head;
+        var previous = element.prev;
+        var next = element.next;
+        
+        previous?.next = next;
+        next?.prev = previous;
+        
+        element.next = nil;
+        element.prev = nil;
+        element.item = nil;
+        
+        if(fixHead)
+        {
+            head = next;
+        }
+        
+        return previous;
+    }
+
     func each(callback:(Int,T?) -> Void)
     {
-        var current = head, idx = 0;
+        weak var current = head;
+        var idx = 0;
         while ( !(current === tail) )
         {
-            let item:T? = (current++)?.item;
+            weak var next = current?.next;
+            let item:T? = current?.item;
             callback(idx++,item);
+            current = next;
         }
     }
     
@@ -150,12 +214,11 @@ class DefaultItem: Priority
     
     deinit
     {
-        NSLog("Ups <");
     }
     
 }
 
-class PQueue<T where T : Priority> : Queue<T>
+class PQueue<T where T: AnyObject, T:Priority> : Queue<T>
 {
     var maximum:Int? {
         get {
